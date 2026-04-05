@@ -1,0 +1,30 @@
+namespace: "https://exocortex.my/plugins/gtd-jedi#"
+version: "0.1.0"
+type: public
+label: "GTD + Jedi Techniques"
+description: "Getting Things Done workflow with Maxim Dorofeev's Jedi Techniques adaptation. Red/green tasks, energy-based filtering, context switching, natural planning."
+author: "kitelev"
+tags: ["gtd", "productivity", "jedi-techniques", "dorofeev", "task-management"]
+
+dependencies:
+  exo-core:
+    git: "https://github.com/kitelev/exocortex-public-ontologies.git"
+    path: "ontologies/exo"
+    version: "^0.3.0"
+  ems:
+    git: "https://github.com/kitelev/exocortex-public-ontologies.git"
+    path: "ontologies/ems"
+    version: "^0.2.0"
+  exocmd:
+    git: "https://github.com/kitelev/exocortex-public-ontologies.git"
+    path: "ontologies/exocmd"
+    version: "^0.1.0"
+
+provides:
+  classes: 4
+  workflow_classes: 11
+  prototypes: 6
+  commands: 6
+  buttons: 5
+  dashboards: 2
+  properties: 4
