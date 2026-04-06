@@ -19,7 +19,8 @@
     "test:integration": "vitest run tests/integration",
     "test:integration:load": "vitest run tests/integration/plugin-load",
     "test:integration:cross-boundary": "vitest run tests/integration/cross-boundary-chain",
-    "test:integration:update": "vitest run tests/integration/plugin-update"
+    "test:integration:update": "vitest run tests/integration/plugin-update",
+    "test:integration:removal": "vitest run tests/integration/plugin-removal"
   },
   "devDependencies": {
     "gray-matter": "^4.0.3",
