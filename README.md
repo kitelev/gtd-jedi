@@ -54,3 +54,4 @@ Based on David Allen's GTD and Maxim Dorofeev's Jedi Techniques:
 - Energy-based filtering: do high-energy tasks when fresh, low-energy when tired
 - Context filtering: @Computer, @Phone, @Office — see only actionable items
 - Weekly Review: the cornerstone habit that keeps the system trusted
+# CI verification
