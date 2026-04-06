@@ -6,7 +6,7 @@ import {
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, execSync, ChildProcess } from "child_process";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -21,6 +21,17 @@ export class ObsidianLauncher {
   constructor(vaultPath?: string) {
     this.vaultPath = vaultPath || path.join(__dirname, "../test-vault");
     this.cdpPort = 9222;
+  }
+
+  private killAllObsidian(): void {
+    try {
+      execSync("pkill -9 -f obsidian 2>/dev/null || true", {
+        stdio: "ignore",
+      });
+      console.log("[ObsidianLauncher] Killed all stale Obsidian processes");
+    } catch {
+      // No processes to kill, that's fine
+    }
   }
 
   async launch(): Promise<void> {
@@ -38,6 +49,10 @@ export class ObsidianLauncher {
         `Obsidian not found at ${obsidianPath}. Set OBSIDIAN_PATH environment variable.`,
       );
     }
+
+    // Kill any stale Obsidian processes from previous test runs or auto-updates
+    this.killAllObsidian();
+    await this.waitForPortClosed(this.cdpPort, 5000);
 
     this.createObsidianConfig();
 
@@ -164,6 +179,78 @@ export class ObsidianLauncher {
 
     console.log("[ObsidianLauncher] Waiting for vault to finish indexing...");
     await this.waitForVaultReady();
+
+    // Handle Obsidian auto-update: it downloads a new .asar and restarts.
+    // After restart, the CDP connection dies. We detect this and reconnect.
+    if (process.env.CI || process.env.DOCKER) {
+      console.log(
+        "[ObsidianLauncher] Checking for auto-update restart (15s stabilization)...",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 15000));
+
+      let connectionAlive = false;
+      try {
+        await this.window.evaluate(() => true);
+        connectionAlive = true;
+      } catch {
+        connectionAlive = false;
+      }
+
+      if (!connectionAlive) {
+        console.log(
+          "[ObsidianLauncher] Connection lost after auto-update restart. Reconnecting...",
+        );
+
+        // Wait for new CDP endpoint
+        await this.waitForPort(this.cdpPort, 30000);
+        console.log("[ObsidianLauncher] New CDP port ready, reconnecting...");
+
+        const browser = await chromium.connectOverCDP(
+          `http://localhost:${this.cdpPort}`,
+          { timeout: 30000 },
+        );
+
+        const contexts = browser.contexts();
+        const context = contexts[0];
+        const pages = context.pages();
+
+        if (pages.length > 1) {
+          this.window = pages[1];
+        } else if (pages.length === 1) {
+          this.window = pages[0];
+        } else {
+          this.window = await context.waitForEvent("page", { timeout: 30000 });
+        }
+
+        await this.window.waitForLoadState("domcontentloaded", {
+          timeout: 30000,
+        });
+
+        // Re-poll for app availability after reconnect
+        for (let i = 0; i < 60; i++) {
+          const ready = await this.window.evaluate(() => {
+            const win = window as any;
+            return !!win.app?.workspace?.activeLeaf;
+          });
+          if (ready) break;
+          await this.window.waitForTimeout(1000);
+        }
+
+        console.log(
+          "[ObsidianLauncher] Checking for trust dialog after reconnect...",
+        );
+        await this.handleTrustDialog();
+
+        console.log(
+          "[ObsidianLauncher] Waiting for vault ready after reconnect...",
+        );
+        await this.waitForVaultReady();
+
+        console.log("[ObsidianLauncher] Reconnected after auto-update!");
+      } else {
+        console.log("[ObsidianLauncher] No restart detected, connection stable");
+      }
+    }
 
     console.log("[ObsidianLauncher] Obsidian ready!");
   }
@@ -526,48 +613,9 @@ export class ObsidianLauncher {
       this.window = null;
     }
 
-    if (this.electronProcess) {
-      const pid = this.electronProcess.pid;
-      console.log(
-        `[ObsidianLauncher] Killing Electron process PID ${pid} with SIGKILL...`,
-      );
-
-      try {
-        // Use SIGKILL for immediate termination
-        this.electronProcess.kill("SIGKILL");
-
-        // Wait for process to exit
-        await new Promise<void>((resolve) => {
-          const checkInterval = setInterval(() => {
-            try {
-              // Check if process still exists
-              process.kill(pid!, 0);
-            } catch (e) {
-              // Process doesn't exist anymore
-              clearInterval(checkInterval);
-              console.log(`[ObsidianLauncher] Process ${pid} terminated`);
-              resolve();
-            }
-          }, 100);
-
-          // Timeout after 5 seconds
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            console.log(
-              `[ObsidianLauncher] Process ${pid} termination timeout (continuing anyway)`,
-            );
-            resolve();
-          }, 5000);
-        });
-      } catch (error) {
-        console.log(
-          "[ObsidianLauncher] Process kill error (may already be dead):",
-          error,
-        );
-      }
-
-      this.electronProcess = null;
-    }
+    // Kill ALL Obsidian processes (handles auto-update spawned children)
+    this.killAllObsidian();
+    this.electronProcess = null;
 
     console.log(
       `[ObsidianLauncher] Waiting for CDP port ${this.cdpPort} to be released...`,
