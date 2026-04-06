@@ -142,6 +142,17 @@ export class MockExocortexApi {
         this.setProperty(assetId, 'ems__Effort_status', 'ems__EffortStatusDone');
         break;
 
+      case 'Defer':
+        this.removeClass(assetId, 'gtd__NextAction');
+        this.addClass(assetId, 'gtd__InboxItem');
+        this.setProperty(assetId, 'ems__Effort_status', 'ems__EffortStatusBacklog');
+        break;
+
+      case 'Complete Review':
+        this.setProperty(assetId, 'ems__Effort_status', 'ems__EffortStatusDone');
+        this.setProperty(assetId, 'ems__Effort_endTimestamp', new Date().toISOString());
+        break;
+
       default:
         throw new Error(`Unknown button: ${buttonLabel}`);
     }
