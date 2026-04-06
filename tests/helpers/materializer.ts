@@ -154,3 +154,71 @@ export function materializeAll(files: ParsedFile[]): MaterializedAsset[] {
   const uidMap = buildUidMap(files);
   return files.map((f) => materializeAsset(f, uidMap));
 }
+
+/**
+ * A materialized triple with depth annotation.
+ * depth 1 = from immediate parent, depth 2 = from grandparent, etc.
+ */
+export interface DepthAnnotatedTriple {
+  predicate: string;
+  value: unknown;
+  sourceDepth: number;
+  sourceUid: string;
+}
+
+export interface DepthAnnotatedAsset {
+  source: ParsedFile;
+  ownProperties: Record<string, unknown>;
+  inheritedTriples: DepthAnnotatedTriple[];
+  allProperties: Record<string, unknown>;
+  prototypeChain: string[];
+}
+
+/**
+ * Materialize with depth annotations — tracks which depth level
+ * each inherited property came from.
+ *
+ * Convention: depth 1 = immediate parent, depth 2 = grandparent, etc.
+ */
+export function materializeWithDepth(
+  file: ParsedFile,
+  uidMap: Map<string, ParsedFile>,
+): DepthAnnotatedAsset {
+  const chain = resolvePrototypeChain(file, uidMap);
+  const ownProperties: Record<string, unknown> = { ...file.frontmatter };
+  const inheritedTriples: DepthAnnotatedTriple[] = [];
+  const allProperties: Record<string, unknown> = { ...file.frontmatter };
+
+  const alreadyDefined = new Set<string>(Object.keys(file.frontmatter));
+
+  for (let i = 0; i < chain.length; i++) {
+    const depth = i + 1; // 1-indexed depth
+    const protoUid = chain[i];
+    const protoFile = uidMap.get(protoUid.toLowerCase());
+    if (!protoFile) continue;
+
+    for (const [key, value] of Object.entries(protoFile.frontmatter)) {
+      if (key === 'exo__Instance_class') continue;
+      if ((NON_INHERITABLE_PROPERTIES as readonly string[]).includes(key)) continue;
+
+      if (!alreadyDefined.has(key)) {
+        inheritedTriples.push({
+          predicate: key,
+          value,
+          sourceDepth: depth,
+          sourceUid: protoUid,
+        });
+        allProperties[key] = value;
+        alreadyDefined.add(key);
+      }
+    }
+  }
+
+  return {
+    source: file,
+    ownProperties,
+    inheritedTriples,
+    allProperties,
+    prototypeChain: chain,
+  };
+}
