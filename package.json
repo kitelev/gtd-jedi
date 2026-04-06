@@ -13,6 +13,7 @@
     "test:conformance:structural": "vitest run tests/conformance/structural",
     "test:conformance:entailment": "vitest run tests/conformance/entailment",
     "test:conformance:non-entailment": "vitest run tests/conformance/non-entailment",
+    "test:conformance:consistency": "vitest run tests/conformance/consistency",
     "test:integration": "vitest run tests/integration",
     "test:integration:load": "vitest run tests/integration/plugin-load"
   },
