@@ -77,16 +77,7 @@ test.describe("GTD Workflow E2E", () => {
     await launcher.waitForElement(".exocortex-layout-rendered", 60000);
 
     const buttonsSection = window.locator(".exocortex-buttons-section");
-    const buttonsVisible = await buttonsSection
-      .isVisible({ timeout: 15000 })
-      .catch(() => false);
-
-    if (!buttonsVisible) {
-      // Plugin rendered but buttons section may not be present if
-      // dynamic command resolution takes longer
-      test.skip(true, "Buttons section not visible — command resolution may need more time");
-      return;
-    }
+    await expect(buttonsSection).toBeVisible({ timeout: 30000 });
 
     const buttonLabels = await window
       .locator(".exocortex-buttons-section .exocortex-action-button")
@@ -109,28 +100,13 @@ test.describe("GTD Workflow E2E", () => {
     await launcher.waitForElement(".exocortex-layout-rendered", 60000);
 
     const buttonsSection = window.locator(".exocortex-buttons-section");
-    const buttonsVisible = await buttonsSection
-      .isVisible({ timeout: 15000 })
-      .catch(() => false);
-
-    if (!buttonsVisible) {
-      test.skip(true, "Buttons section not visible");
-      return;
-    }
+    await expect(buttonsSection).toBeVisible({ timeout: 30000 });
 
     // Find and click "Next Action" button
     const nextActionBtn = window.locator(
       '.exocortex-buttons-section .exocortex-action-button:has-text("Next Action")',
     );
-    const btnVisible = await nextActionBtn
-      .isVisible({ timeout: 5000 })
-      .catch(() => false);
-
-    if (!btnVisible) {
-      test.skip(true, "Next Action button not visible");
-      return;
-    }
-
+    await expect(nextActionBtn).toBeVisible({ timeout: 15000 });
     await nextActionBtn.click();
 
     // Wait for frontmatter to update
@@ -139,30 +115,23 @@ test.describe("GTD Workflow E2E", () => {
     const result = await window.evaluate(async () => {
       const app = (window as any).app;
       const activeFile = app.workspace.getActiveFile();
-      if (!activeFile) return { success: false, error: "No active file" };
+      if (!activeFile) throw new Error("No active file");
 
       const metadata = app.metadataCache.getFileCache(activeFile);
       const frontmatter = metadata?.frontmatter;
 
       return {
-        success: true,
         status: frontmatter?.ems__Effort_status,
         classes: frontmatter?.exo__Instance_class,
       };
     });
 
-    expect(result.success).toBe(true);
-
     // Status should change to Doing
-    if (result.status) {
-      expect(String(result.status)).toContain("Doing");
-    }
+    expect(String(result.status)).toContain("Doing");
 
     // Class should include NextAction
-    if (result.classes) {
-      const classStr = JSON.stringify(result.classes);
-      expect(classStr).toContain("NextAction");
-    }
+    const classStr = JSON.stringify(result.classes);
+    expect(classStr).toContain("NextAction");
   });
 
   test("NextAction task shows Defer button, InboxItem does not", async () => {
@@ -174,14 +143,7 @@ test.describe("GTD Workflow E2E", () => {
     await launcher.waitForElement(".exocortex-layout-rendered", 60000);
 
     const buttonsSection = window.locator(".exocortex-buttons-section");
-    const buttonsVisible = await buttonsSection
-      .isVisible({ timeout: 15000 })
-      .catch(() => false);
-
-    if (!buttonsVisible) {
-      test.skip(true, "Buttons section not visible");
-      return;
-    }
+    await expect(buttonsSection).toBeVisible({ timeout: 30000 });
 
     const nextActionButtons = await window
       .locator(".exocortex-buttons-section .exocortex-action-button")
@@ -202,29 +164,28 @@ test.describe("GTD Workflow E2E", () => {
     const result = await window.evaluate(async () => {
       const app = (window as any).app;
       const activeFile = app.workspace.getActiveFile();
-      if (!activeFile) return { success: false };
+      if (!activeFile) throw new Error("No active file");
 
       const metadata = app.metadataCache.getFileCache(activeFile);
       const frontmatter = metadata?.frontmatter;
 
       return {
-        success: true,
         label: frontmatter?.exo__Asset_label,
         delegatee: frontmatter?.gtd__Effort_delegatee,
         classes: JSON.stringify(frontmatter?.exo__Instance_class),
       };
     });
 
-    expect(result.success).toBe(true);
     expect(result.label).toBe("Review PR from Alice");
     expect(result.delegatee).toBe("Alice");
     expect(result.classes).toContain("WaitingFor");
 
-    // WaitingFor should NOT show InboxItem or NextAction buttons
+    // Wait for plugin to fully render — buttons section may or may not appear
+    // but if it does, WaitingFor-specific buttons must be absent
+    await window.waitForTimeout(5000);
+
     const buttonsSection = window.locator(".exocortex-buttons-section");
-    const buttonsVisible = await buttonsSection
-      .isVisible({ timeout: 10000 })
-      .catch(() => false);
+    const buttonsVisible = await buttonsSection.isVisible().catch(() => false);
 
     if (buttonsVisible) {
       const buttonLabels = await window
@@ -235,6 +196,7 @@ test.describe("GTD Workflow E2E", () => {
       expect(buttonLabels).not.toContain("Next Action");
       expect(buttonLabels).not.toContain("Defer");
     }
-    // If buttons section not visible at all — that's also correct for WaitingFor
+    // If buttons section not visible at all — that's correct for WaitingFor
+    // Both outcomes are valid: no buttons section, or section without NA/Defer
   });
 });
