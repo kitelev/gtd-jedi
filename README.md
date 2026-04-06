@@ -29,6 +29,24 @@ All your task instances will inherit GTD buttons, commands, and visibility rules
 - **Buttons:** Next Action, Delegate, Someday/Maybe, Defer, Complete Review
 - **Dashboards:** GTD Main, Weekly Review
 
+## Testing
+
+```bash
+npm install
+npm run test                        # all tests
+npm run test:conformance            # all conformance tests
+npm run test:conformance:structural # structural validators only
+```
+
+### Structural Conformance
+
+Validates 4 invariants across all plugin `.md` files:
+
+- **wikilinks** — all `[[uuid|...]]` references resolve to existing files
+- **prototypeCycles** — no circular `exo__Asset_prototype` chains (DFS)
+- **classLabels** — every `exo__Class` has `exo__Asset_label`
+- **commandGrounding** — every `exocmd__Command` has `## Grounding` section
+
 ## Philosophy
 
 Based on David Allen's GTD and Maxim Dorofeev's Jedi Techniques:
