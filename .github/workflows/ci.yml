@@ -22,3 +22,19 @@ jobs:
 
       - name: Run all tests
         run: npm test
+
+  test-sparql:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run SPARQL E2E tests (real exocortex-cli engine)
+        run: npm run test:e2e:sparql

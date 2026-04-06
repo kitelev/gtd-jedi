@@ -21,7 +21,8 @@
     "test:integration:cross-boundary": "vitest run tests/integration/cross-boundary-chain",
     "test:integration:update": "vitest run tests/integration/plugin-update",
     "test:integration:removal": "vitest run tests/integration/plugin-removal",
-    "test:e2e": "vitest run tests/e2e",
+    "test:e2e": "vitest run tests/e2e/gtd-full-day.test.ts",
+    "test:e2e:sparql": "vitest run tests/e2e/sparql-real-engine.test.ts",
     "test:perf": "vitest run tests/performance",
     "test:bench": "vitest bench"
   },
