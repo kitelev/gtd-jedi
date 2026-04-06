@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:bdd": "vitest run tests/bdd",
+    "test:bdd:quick-capture": "vitest run tests/bdd/quick-capture",
     "test:conformance": "vitest run tests/conformance",
     "test:conformance:structural": "vitest run tests/conformance/structural"
   },
