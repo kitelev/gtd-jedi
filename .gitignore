@@ -1,3 +1,20 @@
 node_modules/
 dist/
 tests/performance/results.json
+
+# E2E UI test artifacts
+test-results-e2e/
+playwright-report-e2e/
+
+# Downloaded Exocortex plugin (not committed)
+tests/e2e-ui/test-vault/.obsidian/plugins/exocortex/main.js
+tests/e2e-ui/test-vault/.obsidian/plugins/exocortex/manifest.json
+
+# Assembled ontology files in test vault (copied at build time)
+tests/e2e-ui/test-vault/buttons/
+tests/e2e-ui/test-vault/commands/
+tests/e2e-ui/test-vault/dashboards/
+tests/e2e-ui/test-vault/prototypes/
+tests/e2e-ui/test-vault/workflow-classes/
+tests/e2e-ui/test-vault/ontology/
+tests/e2e-ui/test-vault/!gtd-jedi.md

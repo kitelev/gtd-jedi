@@ -174,15 +174,16 @@ describe('E2E: Real SPARQL Engine (exocortex-cli)', { timeout: 120_000 }, () => 
   // ── Prototype chain ──
 
   it('GTD Task Prototype has prototype chain to ems__TaskPrototype', () => {
+    // May return >1 result if e2e-ui test-vault has copies of prototype files
     const results = sparqlQuery(`
       ${PREFIX}
       SELECT ?proto WHERE {
         ?s exo:Asset_label "GTD Task Prototype" .
         ?s exo:Asset_prototype ?proto .
-      }
+      } LIMIT 1
     `);
 
-    expect(results).toHaveLength(1);
+    expect(results.length).toBeGreaterThanOrEqual(1);
     expect(unquote(results[0].proto)).toContain('ems__TaskPrototype');
   });
 

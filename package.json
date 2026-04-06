@@ -23,6 +23,9 @@
     "test:integration:removal": "vitest run tests/integration/plugin-removal",
     "test:e2e": "vitest run tests/e2e/gtd-full-day.test.ts",
     "test:e2e:sparql": "vitest run tests/e2e/sparql-real-engine.test.ts",
+    "test:e2e:ui": "playwright test -c tests/e2e-ui/playwright-e2e.config.ts",
+    "test:e2e:ui:setup": "./scripts/setup-e2e-vault.sh",
+    "test:e2e:ui:local": "./scripts/test-e2e-ui-local.sh",
     "test:perf": "vitest run tests/performance",
     "test:bench": "vitest bench"
   },
@@ -30,6 +33,7 @@
     "gray-matter": "^4.0.3",
     "typescript": "^5.7.0",
     "vitest": "^3.1.0",
-    "glob": "^11.0.0"
+    "glob": "^11.0.0",
+    "@playwright/test": "^1.55.1"
   }
 }

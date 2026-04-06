@@ -38,3 +38,43 @@ jobs:
 
       - name: Run SPARQL E2E tests (real exocortex-cli engine)
         run: npm run test:e2e:sparql
+
+  e2e-ui-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build E2E Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile.e2e
+          load: true
+          tags: gtd-jedi-e2e:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run E2E UI tests
+        run: |
+          mkdir -p test-results-e2e playwright-report-e2e
+          docker run --init --rm \
+            -v $PWD/test-results-e2e:/app/test-results-e2e \
+            -v $PWD/playwright-report-e2e:/app/playwright-report-e2e \
+            -e CI=true \
+            gtd-jedi-e2e:latest
+
+      - name: Upload E2E test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ui-test-artifacts
+          path: |
+            test-results-e2e/
+            playwright-report-e2e/
+          retention-days: 7
+          if-no-files-found: ignore

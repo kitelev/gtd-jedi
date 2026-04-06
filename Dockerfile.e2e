@@ -1,0 +1,96 @@
+# Stage 1: Obsidian base (cached until Obsidian version changes)
+FROM mcr.microsoft.com/playwright:v1.55.1-jammy AS obsidian-base
+
+RUN apt-get update && apt-get install -y \
+    xvfb \
+    x11-utils \
+    fluxbox \
+    libgbm1 \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    libgtk-3-0 \
+    libgdk-pixbuf2.0-0 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxi6 \
+    libxrandr2 \
+    libxtst6 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download Obsidian 1.9.14
+WORKDIR /opt
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then \
+        OBSIDIAN_FILE="obsidian-1.9.14-arm64.tar.gz"; \
+        OBSIDIAN_DIR="obsidian-1.9.14-arm64"; \
+    else \
+        OBSIDIAN_FILE="obsidian-1.9.14.tar.gz"; \
+        OBSIDIAN_DIR="obsidian-1.9.14"; \
+    fi && \
+    wget -q https://github.com/obsidianmd/obsidian-releases/releases/download/v1.9.14/$OBSIDIAN_FILE \
+    && tar -xzf $OBSIDIAN_FILE \
+    && mv $OBSIDIAN_DIR obsidian \
+    && rm $OBSIDIAN_FILE
+
+# Stage 2: Dependencies (cached on package.json changes)
+FROM obsidian-base AS dependencies
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --prefer-offline --no-audit
+
+# Stage 3: Application
+FROM dependencies AS app
+
+# Entrypoint
+COPY docker-entrypoint-e2e.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+# Playwright config and test files
+COPY tests/e2e-ui/ ./tests/e2e-ui/
+
+# gtd-jedi ontology files
+COPY buttons/ ./tests/e2e-ui/test-vault/buttons/
+COPY commands/ ./tests/e2e-ui/test-vault/commands/
+COPY dashboards/ ./tests/e2e-ui/test-vault/dashboards/
+COPY prototypes/ ./tests/e2e-ui/test-vault/prototypes/
+COPY workflow-classes/ ./tests/e2e-ui/test-vault/workflow-classes/
+COPY ontology/ ./tests/e2e-ui/test-vault/ontology/
+COPY !gtd-jedi.md ./tests/e2e-ui/test-vault/
+
+# Download Exocortex plugin from GitHub release
+# Uses build arg to allow pinning version; defaults to latest
+ARG EXOCORTEX_TAG=latest
+RUN --mount=type=secret,id=github_token \
+    GITHUB_TOKEN=$(cat /run/secrets/github_token 2>/dev/null || echo "") && \
+    REPO="kitelev/exocortex" && \
+    PLUGIN_DIR="tests/e2e-ui/test-vault/.obsidian/plugins/exocortex" && \
+    mkdir -p "$PLUGIN_DIR" && \
+    if [ "$EXOCORTEX_TAG" = "latest" ]; then \
+        TAG=$(wget -qO- "https://api.github.com/repos/$REPO/releases/latest" | grep -o '"tag_name": "[^"]*"' | head -1 | cut -d'"' -f4); \
+    else \
+        TAG="$EXOCORTEX_TAG"; \
+    fi && \
+    echo "Downloading Exocortex $TAG..." && \
+    wget -q "https://github.com/$REPO/releases/download/$TAG/main.js" -O "$PLUGIN_DIR/main.js" && \
+    wget -q "https://github.com/$REPO/releases/download/$TAG/manifest.json" -O "$PLUGIN_DIR/manifest.json" && \
+    echo "Plugin installed:" && \
+    ls -lh "$PLUGIN_DIR/"
+
+# Verify vault structure
+RUN echo "=== Vault contents ===" && \
+    find tests/e2e-ui/test-vault -name '*.md' -not -path '*/.obsidian/*' | wc -l && \
+    echo "community-plugins.json:" && \
+    cat tests/e2e-ui/test-vault/.obsidian/community-plugins.json && \
+    echo "Plugin files:" && \
+    ls -lh tests/e2e-ui/test-vault/.obsidian/plugins/exocortex/
+
+ENV DISPLAY=:99
+ENV OBSIDIAN_PATH=/opt/obsidian/obsidian
+ENV OBSIDIAN_VAULT=/app/tests/e2e-ui/test-vault
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["npx", "playwright", "test", "-c", "tests/e2e-ui/playwright-e2e.config.ts"]
