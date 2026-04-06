@@ -10,7 +10,9 @@
     "test:bdd:process-inbox": "vitest run tests/bdd/process-inbox",
     "test:conformance": "vitest run tests/conformance",
     "test:conformance:structural": "vitest run tests/conformance/structural",
-    "test:conformance:entailment": "vitest run tests/conformance/entailment"
+    "test:conformance:entailment": "vitest run tests/conformance/entailment",
+    "test:integration": "vitest run tests/integration",
+    "test:integration:load": "vitest run tests/integration/plugin-load"
   },
   "devDependencies": {
     "gray-matter": "^4.0.3",
