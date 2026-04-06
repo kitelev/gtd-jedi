@@ -8,7 +8,8 @@
     "test:bdd": "vitest run tests/bdd",
     "test:bdd:quick-capture": "vitest run tests/bdd/quick-capture",
     "test:conformance": "vitest run tests/conformance",
-    "test:conformance:structural": "vitest run tests/conformance/structural"
+    "test:conformance:structural": "vitest run tests/conformance/structural",
+    "test:conformance:entailment": "vitest run tests/conformance/entailment"
   },
   "devDependencies": {
     "gray-matter": "^4.0.3",
