@@ -10,6 +10,7 @@
     "test:bdd:process-inbox": "vitest run tests/bdd/process-inbox",
     "test:bdd:multiple-classification": "vitest run tests/bdd/multiple-classification",
     "test:bdd:weekly-review": "vitest run tests/bdd/weekly-review",
+    "test:bdd:quick-start": "vitest run tests/bdd/quick-start",
     "test:conformance": "vitest run tests/conformance",
     "test:conformance:structural": "vitest run tests/conformance/structural",
     "test:conformance:entailment": "vitest run tests/conformance/entailment",
