@@ -59,7 +59,8 @@ COPY dashboards/ ./tests/e2e-ui/test-vault/dashboards/
 COPY prototypes/ ./tests/e2e-ui/test-vault/prototypes/
 COPY workflow-classes/ ./tests/e2e-ui/test-vault/workflow-classes/
 COPY ontology/ ./tests/e2e-ui/test-vault/ontology/
-COPY ["!gtd-jedi.md", "./tests/e2e-ui/test-vault/"]
+# Copy plugin manifest (! in filename requires bind mount to bypass Docker glob)
+RUN --mount=type=bind,source=.,target=/build-ctx cp '/build-ctx/!gtd-jedi.md' ./tests/e2e-ui/test-vault/
 
 # Download Exocortex plugin from GitHub release
 # Uses build arg to allow pinning version; defaults to latest
