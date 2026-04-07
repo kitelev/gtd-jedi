@@ -1,15 +1,14 @@
 import type { ParsedFile } from './parser.js';
 import type { ValidatorError, ValidatorResult } from './check-wikilinks.js';
 
-const COMMAND_MARKERS = ['exocmd__Command'];
-
 function isCommand(file: ParsedFile): boolean {
   const classes = file.frontmatter.exo__Instance_class;
   if (!Array.isArray(classes)) return false;
 
-  return classes.some((cls: string) =>
-    COMMAND_MARKERS.some((marker) => cls.includes(marker)),
-  );
+  // Must have exocmd__Command but NOT exocmd__CommandBinding
+  const hasCommand = classes.some((cls: string) => cls.includes('exocmd__Command'));
+  const isBinding = classes.some((cls: string) => cls.includes('exocmd__CommandBinding'));
+  return hasCommand && !isBinding;
 }
 
 export function checkCommandsHaveGrounding(files: ParsedFile[]): ValidatorResult {
@@ -18,7 +17,11 @@ export function checkCommandsHaveGrounding(files: ParsedFile[]): ValidatorResult
   for (const file of files) {
     if (!isCommand(file)) continue;
 
-    if (!file.body.includes('## Grounding')) {
+    // RFC-009 commands use exocmd__Command_grounding in frontmatter
+    const hasBodyGrounding = file.body.includes('## Grounding');
+    const hasFrontmatterGrounding = !!file.frontmatter.exocmd__Command_grounding;
+
+    if (!hasBodyGrounding && !hasFrontmatterGrounding) {
       errors.push({
         file: file.filePath,
         message: `Command file missing "## Grounding" section`,

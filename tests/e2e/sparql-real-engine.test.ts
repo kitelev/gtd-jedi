@@ -82,18 +82,25 @@ describe('E2E: Real SPARQL Engine (exocortex-cli)', { timeout: 120_000 }, () => 
 
   // ── Commands ──
 
-  it('discovers all 5 GTD commands', () => {
+  it('discovers all GTD commands (5 original + 5 RFC-009 button commands)', () => {
     const commands = allAssets.filter(a =>
-      a.classes.some(c => c.includes('exocmd__Command')),
+      a.classes.some(c => c.includes('exocmd__Command'))
+      && !a.classes.some(c => c.includes('exocmd__CommandBinding')),
     );
     const labels = commands.map(a => a.label).sort();
 
+    // 5 original commands + 5 RFC-009 button commands = 10 total exocmd__Command assets
     expect(labels).toEqual([
+      'Complete Review',
+      'Defer',
+      'Delegate',
       'GTD: Context Filter',
       'GTD: Process Inbox',
       'GTD: Quick Capture',
       'GTD: Quick Start',
       'GTD: Weekly Review',
+      'Next Action',
+      'Someday/Maybe',
     ]);
   });
 

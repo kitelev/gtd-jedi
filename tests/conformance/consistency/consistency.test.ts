@@ -32,8 +32,10 @@ describe('Consistency conformance test case parsing', () => {
 describe('CON-001: Dual plugin button groups coexist', () => {
   it('gtd-jedi has GTD button group', async () => {
     const gtdFiles = await parseAllPluginFiles(PLUGIN_ROOT);
+    // Support both legacy (exo-ui__Button_group) and RFC-009 (exocmd__CommandBinding_group) formats
     const gtdButtons = gtdFiles.filter(
-      (f) => f.frontmatter['exo-ui__Button_group'] === 'GTD',
+      (f) => f.frontmatter['exo-ui__Button_group'] === 'GTD'
+        || f.frontmatter['exocmd__CommandBinding_group'] === 'gtd',
     );
     expect(gtdButtons.length).toBeGreaterThanOrEqual(5);
   });
@@ -82,7 +84,8 @@ describe('CON-001: Dual plugin button groups coexist', () => {
     const allFiles = [...gtdFiles, ...okrFiles];
 
     const gtdButtons = allFiles.filter(
-      (f) => f.frontmatter['exo-ui__Button_group'] === 'GTD',
+      (f) => f.frontmatter['exo-ui__Button_group'] === 'GTD'
+        || f.frontmatter['exocmd__CommandBinding_group'] === 'gtd',
     );
     const okrButtons = allFiles.filter(
       (f) => f.frontmatter['exo-ui__Button_group'] === 'OKR',

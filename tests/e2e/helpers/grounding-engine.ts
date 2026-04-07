@@ -219,7 +219,13 @@ export function loadCommands(store: PluginStore): CommandDef[] {
   return store.files
     .filter(f => {
       const classes = f.frontmatter.exo__Instance_class;
-      return Array.isArray(classes) && classes.some((c: string) => c.includes('exocmd__Command'));
+      if (!Array.isArray(classes)) return false;
+      if (!classes.some((c: string) => c.includes('exocmd__Command'))) return false;
+      // Exclude RFC-009 button commands (they have grounding in frontmatter, not body)
+      // and exclude CommandBinding files
+      if (f.frontmatter.exocmd__Command_grounding) return false;
+      if (classes.some((c: string) => c.includes('exocmd__CommandBinding'))) return false;
+      return true;
     })
     .map(f => ({
       uid: f.uid!,
@@ -321,6 +327,11 @@ export function executeButtonGrounding(
         asset.classes = asset.classes.filter(c => c !== step.target);
         break;
 
+      case 'clear_classes':
+        // RFC-009: property_delete on exo__Instance_class removes all classes
+        asset.classes = [];
+        break;
+
       case 'property_add_class':
         if (!asset.classes.includes(step.target)) {
           asset.classes.push(step.target);
@@ -356,7 +367,8 @@ export interface ButtonDef {
 }
 
 export function loadButtons(store: PluginStore): ButtonDef[] {
-  return store.files
+  // Legacy format: exo-ui__Button
+  const legacyButtons = store.files
     .filter(f => {
       const classes = f.frontmatter.exo__Instance_class;
       return Array.isArray(classes) && classes.some((c: string) => c.includes('exo-ui__Button'));
@@ -370,6 +382,194 @@ export function loadButtons(store: PluginStore): ButtonDef[] {
       visibility: parseVisibility(f.body),
       grounding: parseButtonGrounding(f.body),
     }));
+
+  // RFC-009 format: exocmd__Command with exocmd__Command_grounding
+  const rfc009Buttons = loadRFC009Buttons(store);
+
+  return [...legacyButtons, ...rfc009Buttons];
+}
+
+/**
+ * Load RFC-009 format buttons (exocmd__Command + exocmd__CommandBinding +
+ * exocmd__Precondition + exocmd__Grounding).
+ */
+function loadRFC009Buttons(store: PluginStore): ButtonDef[] {
+  // Find all exocmd__Command files that have grounding in frontmatter
+  const commandFiles = store.files.filter(f => {
+    const classes = f.frontmatter.exo__Instance_class;
+    if (!Array.isArray(classes)) return false;
+    return classes.some((c: string) => c.includes('exocmd__Command'))
+      && !!f.frontmatter.exocmd__Command_grounding;
+  });
+
+  // Find all bindings to get group info
+  const bindingFiles = store.files.filter(f => {
+    const classes = f.frontmatter.exo__Instance_class;
+    if (!Array.isArray(classes)) return false;
+    return classes.some((c: string) => c.includes('exocmd__CommandBinding'));
+  });
+
+  return commandFiles.map(cmdFile => {
+    // Find binding for this command
+    const binding = bindingFiles.find(b => {
+      const cmdRef = b.frontmatter.exocmd__CommandBinding_command as string;
+      return cmdRef && cmdRef.includes(cmdFile.uid!);
+    });
+
+    // Parse precondition SPARQL into visibility rule
+    const preconditionRef = cmdFile.frontmatter.exocmd__Command_precondition as string;
+    const visibility = preconditionRef
+      ? resolveRFC009Visibility(store, preconditionRef)
+      : null;
+
+    // Resolve grounding steps
+    const groundingRef = cmdFile.frontmatter.exocmd__Command_grounding as string;
+    const grounding = groundingRef
+      ? resolveRFC009Grounding(store, groundingRef)
+      : [];
+
+    // Map icon to variant for backward compat
+    const icon = (cmdFile.frontmatter.exocmd__Command_icon as string) ?? '';
+    let variant = 'ghost';
+    if (icon === 'play' || icon === 'check') variant = 'primary';
+    else if (icon === 'user') variant = 'secondary';
+
+    return {
+      uid: cmdFile.uid!,
+      label: cmdFile.frontmatter.exo__Asset_label as string,
+      variant,
+      icon,
+      group: (binding?.frontmatter.exocmd__CommandBinding_group as string)?.toUpperCase() ?? 'GTD',
+      visibility,
+      grounding,
+    };
+  });
+}
+
+/**
+ * Extract UID from a wikilink like "[[uuid|label]]" or "[[uuid]]"
+ */
+function extractWikilinkUid(wikilink: string): string | null {
+  const match = wikilink.match(/\[\[([^\]|]+)/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Resolve RFC-009 precondition SPARQL ASK into a VisibilityRule.
+ */
+function resolveRFC009Visibility(store: PluginStore, preconditionRef: string): VisibilityRule | null {
+  const uid = extractWikilinkUid(preconditionRef);
+  if (!uid) return null;
+
+  const file = store.filesByUid.get(uid);
+  if (!file) return null;
+
+  const sparql = file.frontmatter.exocmd__Precondition_sparqlAsk as string;
+  if (!sparql) return null;
+
+  return parseSparqlAskVisibility(sparql);
+}
+
+/**
+ * Parse SPARQL ASK into a VisibilityRule for test compatibility.
+ */
+function parseSparqlAskVisibility(sparql: string): VisibilityRule {
+  const alternativeClasses: string[][] = [];
+  let statusCondition: string | undefined;
+
+  // Extract class CONTAINS filters
+  const classMatches = sparql.matchAll(/CONTAINS\(STR\(\?cls\),\s*"([^"]+)"\)/g);
+  const classNames: string[] = [];
+  for (const m of classMatches) {
+    classNames.push(m[1]);
+  }
+
+  // Extract status CONTAINS filter
+  const statusMatch = sparql.match(/CONTAINS\(STR\(\?s\),\s*"([^"]+)"\)/);
+  if (statusMatch) {
+    statusCondition = `ems__${statusMatch[1]}`;
+  }
+
+  // Check if classes are ORed (|| in FILTER) or separate
+  if (sparql.includes('||')) {
+    // OR condition: each class is an alternative
+    for (const cls of classNames) {
+      alternativeClasses.push([cls]);
+    }
+  } else {
+    // AND condition or single class
+    if (classNames.length > 0) {
+      alternativeClasses.push(classNames);
+    }
+  }
+
+  return { alternativeClasses, statusCondition };
+}
+
+/**
+ * Resolve RFC-009 grounding wikilink into GroundingStep array.
+ */
+function resolveRFC009Grounding(store: PluginStore, groundingRef: string): GroundingStep[] {
+  const uid = extractWikilinkUid(groundingRef);
+  if (!uid) return [];
+
+  const file = store.filesByUid.get(uid);
+  if (!file) return [];
+
+  const type = file.frontmatter.exocmd__Grounding_type as string;
+
+  if (type === 'composite') {
+    const steps = file.frontmatter.exocmd__Grounding_steps;
+    if (!Array.isArray(steps)) return [];
+
+    const result: GroundingStep[] = [];
+    for (const stepRef of steps) {
+      const stepUid = extractWikilinkUid(stepRef as string);
+      if (!stepUid) continue;
+
+      const stepFile = store.filesByUid.get(stepUid);
+      if (!stepFile) continue;
+
+      const stepType = stepFile.frontmatter.exocmd__Grounding_type as string;
+      const targetProp = stepFile.frontmatter.exocmd__Grounding_targetProperty as string;
+      const targetValue = stepFile.frontmatter.exocmd__Grounding_targetValue as string;
+
+      if (stepType === 'property_delete' && targetProp === 'exo__Instance_class') {
+        // Translate to property_remove_class for each class the asset has
+        // In the test runtime, we handle this as a special "clear_classes" action
+        result.push({ action: 'clear_classes', target: 'exo__Instance_class' });
+      } else if (stepType === 'property_set' && targetProp === 'exo__Instance_class') {
+        // Parse the target value to extract class wikilinks
+        const classMatches = targetValue.matchAll(/\[\[([^\]|]+)/g);
+        for (const m of classMatches) {
+          result.push({ action: 'property_add_class', target: m[1] });
+        }
+      } else if (stepType === 'property_set') {
+        // Extract value from wikilink if present
+        const wlMatch = targetValue?.match(/\[\[([^\]|]+)/);
+        const value = wlMatch ? wlMatch[1] : targetValue;
+        result.push({ action: 'property_set', target: targetProp, value });
+      } else if (stepType === 'property_delete') {
+        result.push({ action: 'property_delete', target: targetProp });
+      }
+    }
+    return result;
+  }
+
+  // Non-composite grounding
+  const targetProp = file.frontmatter.exocmd__Grounding_targetProperty as string;
+  const targetValue = file.frontmatter.exocmd__Grounding_targetValue as string;
+
+  if (type === 'property_set') {
+    const wlMatch = targetValue?.match(/\[\[([^\]|]+)/);
+    const value = wlMatch ? wlMatch[1] : targetValue;
+    return [{ action: 'property_set', target: targetProp, value }];
+  }
+  if (type === 'property_delete') {
+    return [{ action: 'property_delete', target: targetProp }];
+  }
+
+  return [];
 }
 
 /**

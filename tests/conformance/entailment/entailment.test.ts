@@ -57,7 +57,8 @@ describe('Materializer helpers', () => {
 describe('ENT-001: GTD buttons exist for TaskPrototype inheritors', () => {
   it('plugin defines buttons with GTD button group', async () => {
     const files = await parseAllPluginFiles(PLUGIN_ROOT);
-    const buttons = files.filter((f) => {
+    // Support both legacy (exo-ui__Button) and RFC-009 (exocmd__Command + exocmd__CommandBinding) formats
+    const legacyButtons = files.filter((f) => {
       const classes = f.frontmatter.exo__Instance_class;
       if (Array.isArray(classes)) {
         return classes.some((c: string) => c.includes('exo-ui__Button'));
@@ -65,18 +66,31 @@ describe('ENT-001: GTD buttons exist for TaskPrototype inheritors', () => {
       return false;
     });
 
-    expect(buttons.length).toBeGreaterThanOrEqual(5);
+    const rfc009Bindings = files.filter((f) => {
+      const classes = f.frontmatter.exo__Instance_class;
+      if (Array.isArray(classes)) {
+        return classes.some((c: string) => c.includes('exocmd__CommandBinding'));
+      }
+      return false;
+    });
 
-    const gtdButtons = buttons.filter(
+    const totalButtons = legacyButtons.length + rfc009Bindings.length;
+    expect(totalButtons).toBeGreaterThanOrEqual(5);
+
+    const gtdLegacy = legacyButtons.filter(
       (b) => b.frontmatter['exo-ui__Button_group'] === 'GTD',
     );
-    expect(gtdButtons.length).toBeGreaterThanOrEqual(5);
+    const gtdRfc009 = rfc009Bindings.filter(
+      (b) => b.frontmatter['exocmd__CommandBinding_group'] === 'gtd',
+    );
+    expect(gtdLegacy.length + gtdRfc009.length).toBeGreaterThanOrEqual(5);
   });
 
   it('all GTD buttons are defined by gtd-jedi namespace', async () => {
     const files = await parseAllPluginFiles(PLUGIN_ROOT);
     const buttons = files.filter(
-      (f) => f.frontmatter['exo-ui__Button_group'] === 'GTD',
+      (f) => f.frontmatter['exo-ui__Button_group'] === 'GTD'
+        || f.frontmatter['exocmd__CommandBinding_group'] === 'gtd',
     );
 
     for (const button of buttons) {
