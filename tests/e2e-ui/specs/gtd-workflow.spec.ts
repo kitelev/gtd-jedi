@@ -49,7 +49,7 @@ test.describe("GTD Workflow E2E", () => {
       // Verify gtd-jedi ontology files are in the vault
       const gtdManifest = app.vault.getAbstractFileByPath("!gtd-jedi.md");
       const buttonFile = app.vault.getAbstractFileByPath(
-        "buttons/08efa084-6fb5-43c8-8a36-211fce252473.md",
+        "buttons/663c42da-11f6-4453-bd41-b37baf5bee9b.md",
       );
       const commandFile = app.vault.getAbstractFileByPath(
         "commands/6dc7560d-20e8-4aea-88c5-f22691fb2130.md",

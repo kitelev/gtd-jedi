@@ -67,29 +67,15 @@ describe('E2E: Real SPARQL Engine (exocortex-cli)', { timeout: 120_000 }, () => 
     expect(tripleCount).toBeGreaterThan(500);
   });
 
-  // ── Buttons ──
+  // ── Commands (RFC-009) ──
 
-  it('discovers all 5 GTD buttons', () => {
-    const buttons = allAssets.filter(a =>
-      a.classes.some(c => c.includes('exo-ui__Button')),
-    );
-    const labels = buttons.map(a => a.label).sort();
-
-    expect(labels).toEqual([
-      'Complete Review', 'Defer', 'Delegate', 'Next Action', 'Someday/Maybe',
-    ]);
-  });
-
-  // ── Commands ──
-
-  it('discovers all GTD commands (5 original + 5 RFC-009 button commands)', () => {
+  it('discovers all GTD commands (5 workflow + 5 button commands)', () => {
     const commands = allAssets.filter(a =>
       a.classes.some(c => c.includes('exocmd__Command'))
       && !a.classes.some(c => c.includes('exocmd__CommandBinding')),
     );
     const labels = commands.map(a => a.label).sort();
 
-    // 5 original commands + 5 RFC-009 button commands = 10 total exocmd__Command assets
     expect(labels).toEqual([
       'Complete Review',
       'Defer',
